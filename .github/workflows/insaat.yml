@@ -18,19 +18,19 @@ jobs:
           mkdir -p iso/boot/grub
           mkdir -p iso/live
           
-          # 1. Temel Sistemi Kur
-          sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
+          # 1. Temel Sistemi Kur (Inatci Mod)
+          sudo debootstrap --arch=amd64 --include=gnupg,ca-certificates bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. Hata 100 Cozumu
+          # 2. Hata 100 İlacı: Depoları En Sağlam Şekilde İçeri Yaz
           sudo bash -c 'cat <<EOF > chroot-dir/etc/apt/sources.list
           deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
           deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
           deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
           EOF'
           
-          # 3. Paketleri Kur
+          # 3. Paket Kurulumu (Kritik: --fix-missing eklendi)
           sudo chroot chroot-dir apt-get update
-          sudo chroot chroot-dir apt-get install -y --no-install-recommends \
+          sudo chroot chroot-dir apt-get install -y --fix-missing --no-install-recommends \
             linux-image-amd64 live-boot sudo xorg sddm kde-plasma-desktop \
             konsole dolphin firefox-esr libreoffice-writer libreoffice-calc \
             libreoffice-l10n-tr nanorc
@@ -40,12 +40,11 @@ jobs:
           echo "aspendos:123" | sudo chroot chroot-dir chpasswd
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 5. Logo
+          # 5. Dosya Hazırlıkları
           sudo mkdir -p chroot-dir/usr/share/aspendos
-          if [ -f "logo.jpg" ]; then
-            sudo cp logo.jpg chroot-dir/usr/share/aspendos/logo.jpg
-          fi
+          [ -f "logo.jpg" ] && sudo cp logo.jpg chroot-dir/usr/share/aspendos/logo.jpg
           
-          # 6. Kernel ve Initrd
           cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
-          cp chroot-dir/boot/initrd.img-* iso/boot
+          cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
+          
+          # 6. Sık
