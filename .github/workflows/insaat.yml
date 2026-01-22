@@ -13,22 +13,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xorriso grub-pc-bin grub-common mtools squashfs-tools debootstrap
 
-      - name: Aspendos Sarayini Insa Et
+      - name: Aspendos GNOME Insa Et
         run: |
           mkdir -p iso/boot/grub
           mkdir -p iso/live
           
-          # 1. Temel Sistem
+          # 1. Temel Sistem Kurulumu
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. Depolar
+          # 2. Depo Ayarları
           sudo bash -c 'cat <<EOF > chroot-dir/etc/apt/sources.list
           deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
           deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
           deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
           EOF'
           
-          # 3. GNOME ve Sürücü Kurulumu (Hata Payı Bırakmıyoruz)
+          # 3. GNOME, Sürücüler ve Uygulamalar
           sudo chroot chroot-dir /bin/bash -c "export DEBIAN_FRONTEND=noninteractive && \
             apt-get update && \
             apt-get install -y --no-install-recommends \
@@ -38,29 +38,53 @@ jobs:
             firefox-esr libreoffice-writer libreoffice-calc \
             libreoffice-l10n-tr locales mesa-utils"
 
-          # 4. Dil ve Kullanıcı
+          # 4. Dil ve Kullanıcı Ayarları
           sudo chroot chroot-dir /bin/bash -c "echo 'tr_TR.UTF-8 UTF-8' > /etc/locale.gen && locale-gen"
           sudo chroot chroot-dir useradd -m -s /bin/bash aspendos
           echo "aspendos:123" | sudo chroot chroot-dir chpasswd
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 5. Kernel ve ISO Hazırlığı
+          # 5. LOGO VE DUVAR KAĞIDI AYARI
+          # Logoyu sisteme gömüyoruz
+          sudo mkdir -p chroot-dir/usr/share/backgrounds/aspendos
+          if [ -f "logo.png" ]; then
+            sudo cp logo.png chroot-dir/usr/share/backgrounds/aspendos/wallpaper.png
+            # GNOME varsayılan arka plan ayarı
+            sudo mkdir -p chroot-dir/etc/dconf/db/local.d/
+            sudo bash -c 'cat <<EOF > chroot-dir/etc/dconf/db/local.d/01-background
+          [org/gnome/desktop/background]
+          picture-uri="file:///usr/share/backgrounds/aspendos/wallpaper.png"
+          picture-options="zoom"
+          EOF'
+            sudo chroot chroot-dir dconf update || true
+          fi
+
+          # 6. Kernel Dosyalarını Kopyala
           cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
           cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
           
+          # 7. Sıkıştırma (XZ formatı ile maksimum verim)
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend -comp xz
           
-          echo 'set default=0
+          # 8. Boot Menüsü (Açılışta Logo Desteği)
+          if [ -f "logo.png" ]; then
+            cp logo.png iso/boot/grub/splash.png
+            SPLASH_CMD="insmod png; background_image /boot/grub/splash.png"
+          fi
+          
+          echo "set default=0
           set timeout=5
-          menuentry "Aspendos OS - GNOME Edition" {
+          $SPLASH_CMD
+          menuentry \"Aspendos OS - GNOME Elite\" {
             linux /boot/vmlinuz boot=live quiet splash
             initrd /boot/initrd.img
-          }' > iso/boot/grub/grub.cfg
+          }" > iso/boot/grub/grub.cfg
           
+          # 9. ISO Oluşturma
           sudo grub-mkrescue -o output.iso iso
 
       - name: ISOyu Gonder
         uses: actions/upload-artifact@v4
         with:
-          name: Aspendos-GNOME-ISO
+          name: Aspendos-GNOME-Elite-ISO
           path: output.iso
