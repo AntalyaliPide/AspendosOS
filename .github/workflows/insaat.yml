@@ -1,4 +1,4 @@
-name: Aspendos ISO Insa
+name: Aspendos ISO Final
 on: [push]
 
 jobs:
@@ -8,33 +8,32 @@ jobs:
       - name: Kodlari Cek
         uses: actions/checkout@v4
 
-      - name: Aracları Yukle
+      - name: Gerekli Araclar
         run: |
           sudo apt-get update
-          sudo apt-get install -y debootstrap squashfs-tools xorriso grub-pc-bin grub-common mtools
+          sudo apt-get install -y xorriso grub-pc-bin grub-common mtools squashfs-tools debootstrap
 
-      - name: Sistemi Insa Et
+      - name: ISOyu Paketle
         run: |
-          # Klasorleri hazirla
-          mkdir -p aspendos_root/live
+          # Klasor hiyarsisi
+          mkdir -p iso/boot/grub
+          mkdir -p iso/live
           
-          # En temel Debian sistemini indir (Hata vermemesi için minbase seçtik)
+          # Temel sistemi tekrar hizlica olustur
           sudo debootstrap --arch=amd64 --variant=minbase bookworm chroot-dir http://deb.debian.org/debian/
+          sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend
           
-          # Sisteme kimlik kazandir
-          echo "AspendosOS" | sudo tee chroot-dir/etc/hostname
+          # Grub (Baslangic Menusu) Ayari
+          echo 'menuentry "Aspendos OS (AntalyaliPide Edition)" {
+            linux /boot/vmlinuz boot=live
+            initrd /boot/initrd.img
+          }' > iso/boot/grub/grub.cfg
           
-          # Sistemi paketle (Squashfs)
-          sudo mksquashfs chroot-dir aspendos_root/live/filesystem.squashfs -noappend -e boot
-          
-          # ISO yapisi icin gerekli klasoru hazirla
-          mkdir -p output
-          # Test amacli bir dosya daha ekleyelim ki boş kalmasın
-          cp aspendos_root/live/filesystem.squashfs output/
-          echo "Aspendos Core v1" > output/versiyon.txt
+          # ISO Olusturma Komutu
+          grub-mkrescue -o aspendos-os-v1.iso iso
 
-      - name: Aspendos Dosyalarını Yukle
+      - name: ISOyu Bize Gonder
         uses: actions/upload-artifact@v4
         with:
-          name: Aspendos-Sistem-Dosyalari
-          path: output/
+          name: Aspendos-Gercer-ISO
+          path: "*.iso"
