@@ -15,32 +15,47 @@ jobs:
 
       - name: Aspendos Sarayini Insa Et
         run: |
+          # Klasörleri temiz ve taze oluştur
           mkdir -p iso/boot/grub
           mkdir -p iso/live
           
           # 1. Temel Sistemi Kur
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. Depo Listesi (Loglarında çalıştığı onaylandı)
+          # 2. Depoları Tanımla
           sudo bash -c 'cat <<EOF > chroot-dir/etc/apt/sources.list
           deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
           deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
           deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
           EOF'
           
-          # 3. Paket Kurulumu (nanorc sildik, artik hata yok!)
+          # 3. Paketleri Kur (Hafifletilmiş Liste - Önce ISO'yu görelim!)
           sudo chroot chroot-dir /bin/bash -c "export DEBIAN_FRONTEND=noninteractive && \
             apt-get update && \
-            apt-get install -y --fix-missing --no-install-recommends \
-            linux-image-amd64 live-boot sudo xorg sddm kde-plasma-desktop \
-            konsole dolphin firefox-esr libreoffice-writer libreoffice-calc \
-            libreoffice-l10n-tr"
+            apt-get install -y --no-install-recommends \
+            linux-image-amd64 live-boot sudo xorg sddm kde-plasma-desktop konsole"
 
-          # 4. Kullanici Ayari (aspendos / 123)
-          sudo chroot chroot-dir useradd -m -s /bin/bash aspendos
-          echo "aspendos:123" | sudo chroot chroot-dir chpasswd
-          echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
+          # 4. Kernel Dosyalarını Kopyala (Hata varsa burada durur)
+          cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz || exit 1
+          cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img || exit 1
+          
+          # 5. Sıkıştırma (En kritik yer)
+          sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend || exit 1
+          
+          # 6. Boot Menüsü
+          echo 'set default=0
+          set timeout=5
+          menuentry "Aspendos OS" {
+            linux /boot/vmlinuz boot=live quiet splash
+            initrd /boot/initrd.img
+          }' > iso/boot/grub/grub.cfg
+          
+          # 7. ISOyu Oluştur
+          sudo grub-mkrescue -o output.iso iso
 
-          # 5. Kernel ve Initrd Hazirligi
-          cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
-          cp chroot-dir/boot/initrd.img-* iso/boot/initrd.
+      - name: ISOyu Gonder
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aspendos-Elite-KDE-ISO
+          path: output.iso
+          if-no-files-found: error # ISO yoksa hata ver ki anlayalım!
