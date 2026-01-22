@@ -1,4 +1,4 @@
-name: Aspendos ISO Masaustu Dahil
+name: Aspendos Elite Edition (KDE Plasma)
 on: [push]
 
 jobs:
@@ -18,42 +18,47 @@ jobs:
           mkdir -p iso/boot/grub
           mkdir -p iso/live
           
-          # 1. Sistemi Kur (Arayuz paketlerini buraya ekledik!)
+          # 1. Temel Sistemi Kur
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. Kernel + Masaustu (XFCE) + Giris Ekrani direkt fırına!
+          # 2. KDE Plasma, Ofis ve Internet Paketi (Gerçek Güç Burada)
           sudo chroot chroot-dir apt-get update
           sudo chroot chroot-dir apt-get install -y --no-install-recommends \
-            linux-image-amd64 live-boot sudo xorg xfce4 xfce4-terminal lightdm
+            linux-image-amd64 live-boot sudo xorg sddm kde-plasma-desktop \
+            konsole dolphin firefox-esr libreoffice-writer libreoffice-calc \
+            libreoffice-l10n-tr nanorc
 
-          # 3. Kullanici Ayari
+          # 3. Kullanici Ayari (aspendos / 123)
           sudo chroot chroot-dir useradd -m -s /bin/bash aspendos
           echo "aspendos:123" | sudo chroot chroot-dir chpasswd
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 4. Logo Ekleme
+          # 4. Logo Klasörünü Hazırla
           sudo mkdir -p chroot-dir/usr/share/aspendos
           if [ -f "logo.jpg" ]; then
             sudo cp logo.jpg chroot-dir/usr/share/aspendos/logo.jpg
           fi
-
-          # 5. Paketleme
+          
+          # 5. Kernel ve Initrd Dosyalarini Tasi
           cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
           cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
+          
+          # 6. Dosya Sistemini Sıkıştır (Bu işlem biraz sürer)
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend
           
-          # 6. Grub
+          # 7. Boot Menusu (Grub)
           echo 'set default=0
           set timeout=5
-          menuentry "Aspendos OS - Masaustu Surumu" {
+          menuentry "Aspendos OS - KDE Elite" {
             linux /boot/vmlinuz boot=live quiet splash
             initrd /boot/initrd.img
           }' > iso/boot/grub/grub.cfg
           
+          # 8. ISO'yu Oluştur
           sudo grub-mkrescue -o output.iso iso
 
       - name: ISOyu Gonder
         uses: actions/upload-artifact@v4
         with:
-          name: Aspendos-Masaustu-ISO
+          name: Aspendos-Elite-KDE-ISO
           path: output.iso
