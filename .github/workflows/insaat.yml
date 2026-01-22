@@ -1,4 +1,4 @@
-name: Aspendos Elite Office Edition
+name: Aspendos Elite GNOME Edition
 on: [push]
 
 jobs:
@@ -18,50 +18,49 @@ jobs:
           mkdir -p iso/boot/grub
           mkdir -p iso/live
           
-          # 1. Temel Sistemi Kur
+          # 1. Temel Sistem
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. Depolar (Contrib ve Non-Free Dahil)
+          # 2. Depolar
           sudo bash -c 'cat <<EOF > chroot-dir/etc/apt/sources.list
           deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
           deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
           deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
           EOF'
           
-          # 3. Full Paket Kurulumu (Firefox + LibreOffice + Türkçe Destek)
+          # 3. GNOME ve Sürücü Kurulumu (Hata Payı Bırakmıyoruz)
           sudo chroot chroot-dir /bin/bash -c "export DEBIAN_FRONTEND=noninteractive && \
             apt-get update && \
-            apt-get install -y --fix-missing --no-install-recommends \
-            linux-image-amd64 live-boot sudo xorg sddm kde-plasma-desktop \
-            konsole dolphin firefox-esr libreoffice-writer libreoffice-calc \
-            libreoffice-l10n-tr locales"
+            apt-get install -y --no-install-recommends \
+            linux-image-amd64 live-boot sudo \
+            xserver-xorg-core xserver-xorg-video-all xserver-xorg-input-all \
+            gnome-core gnome-terminal nautilus \
+            firefox-esr libreoffice-writer libreoffice-calc \
+            libreoffice-l10n-tr locales mesa-utils"
 
-          # 4. Türkçe Dil Ayarı ve Kullanıcı
+          # 4. Dil ve Kullanıcı
           sudo chroot chroot-dir /bin/bash -c "echo 'tr_TR.UTF-8 UTF-8' > /etc/locale.gen && locale-gen"
           sudo chroot chroot-dir useradd -m -s /bin/bash aspendos
           echo "aspendos:123" | sudo chroot chroot-dir chpasswd
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 5. Kernel Hazırlığı
+          # 5. Kernel ve ISO Hazırlığı
           cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
           cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
           
-          # 6. Sıkıştırma (Elite Sıkıştırma)
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend -comp xz
           
-          # 7. Boot Menüsü
           echo 'set default=0
           set timeout=5
-          menuentry "Aspendos OS - Elite Office Edition" {
+          menuentry "Aspendos OS - GNOME Edition" {
             linux /boot/vmlinuz boot=live quiet splash
             initrd /boot/initrd.img
           }' > iso/boot/grub/grub.cfg
           
-          # 8. ISO Oluştur
           sudo grub-mkrescue -o output.iso iso
 
       - name: ISOyu Gonder
         uses: actions/upload-artifact@v4
         with:
-          name: Aspendos-Elite-Full-ISO
+          name: Aspendos-GNOME-ISO
           path: output.iso
