@@ -1,5 +1,7 @@
 name: Aspendos Elite GNOME Edition
-on: [push]
+on:
+  push:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -45,11 +47,9 @@ jobs:
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
           # 5. LOGO VE DUVAR KAĞIDI AYARI
-          # Logoyu sisteme gömüyoruz
           sudo mkdir -p chroot-dir/usr/share/backgrounds/aspendos
           if [ -f "logo.png" ]; then
             sudo cp logo.png chroot-dir/usr/share/backgrounds/aspendos/wallpaper.png
-            # GNOME varsayılan arka plan ayarı
             sudo mkdir -p chroot-dir/etc/dconf/db/local.d/
             sudo bash -c 'cat <<EOF > chroot-dir/etc/dconf/db/local.d/01-background
           [org/gnome/desktop/background]
@@ -63,10 +63,11 @@ jobs:
           cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
           cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
           
-          # 7. Sıkıştırma (XZ formatı ile maksimum verim)
+          # 7. Sıkıştırma
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend -comp xz
           
           # 8. Boot Menüsü (Açılışta Logo Desteği)
+          SPLASH_CMD=""
           if [ -f "logo.png" ]; then
             cp logo.png iso/boot/grub/splash.png
             SPLASH_CMD="insmod png; background_image /boot/grub/splash.png"
@@ -81,10 +82,4 @@ jobs:
           }" > iso/boot/grub/grub.cfg
           
           # 9. ISO Oluşturma
-          sudo grub-mkrescue -o output.iso iso
-
-      - name: ISOyu Gonder
-        uses: actions/upload-artifact@v4
-        with:
-          name: Aspendos-GNOME-Elite-ISO
-          path: output.iso
+          sudo grub-mkrescue -o output
