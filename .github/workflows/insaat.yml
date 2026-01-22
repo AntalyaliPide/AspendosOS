@@ -1,4 +1,4 @@
-name: Aspendos ISO Insa
+name: Aspendos ISO Tam Insa
 on: [push]
 
 jobs:
@@ -11,25 +11,26 @@ jobs:
       - name: Insa Araclarini Kur
         run: |
           sudo apt-get update
-          sudo apt-get install -y mtools xorriso squashfs-tools wget debootstrap
+          sudo apt-get install -y live-build
 
-      - name: Aspendos'u Insa Et
+      - name: ISOyu Gercekten Olustur
         run: |
-          mkdir -p work-dir
-          # Temel Debian sistemini kuruyoruz (Aspendos'un kalbi)
-          sudo debootstrap --arch=amd64 --variant=minbase bookworm work-dir http://deb.debian.org/debian/
+          mkdir build && cd build
+          # Bu komut Debian tabanli tam bir ISO yapilandirmasi hazirlar
+          lb config --binary-images iso-hybrid --architectures amd64 \
+                    --distribution bookworm --debian-installer live \
+                    --archive-areas "main contrib non-free non-free-firmware"
           
-          # Sistem icine temel paketleri ekleyelim
-          sudo chroot work-dir apt-get update
-          sudo chroot work-dir apt-get install -y --no-install-recommends linux-image-amd64 live-boot network-manager gnome-core
+          # GNOME ve temel ihtiyaclari ekliyoruz
+          mkdir -p config/package-lists
+          echo "gnome-core network-manager firefox-esr" > config/package-lists/aspendos.list.chroot
           
-          # Bos bir ISO olusturma simülasyonu (Hata almamak icin simdilik temel yapi)
-          mkdir -p output
-          echo "Aspendos OS v1.0 Alpha" > output/versiyon.txt
-          # Buraya ilerleyen adimlarda tam ISO komutunu ekleyecegiz
+          # Pisirme islemi basliyor (Bu biraz uzun surer)
+          sudo lb build
 
-      - name: Dosyayi Yukle
+      - name: ISOyu Yukle
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Aspendos-Paketi
-          path: output/
+          name: Aspendos-Gercer-ISO
+          path: build/*.iso
