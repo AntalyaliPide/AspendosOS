@@ -1,16 +1,35 @@
-name: Aspendos Test
+name: Aspendos ISO Insa
 on: [push]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Basit Bir Dosya Olustur
+      - name: Kodlari Cek
+        uses: actions/checkout@v4
+
+      - name: Insa Araclarini Kur
         run: |
-          mkdir build
-          echo "Aspendos OS Yakinda Burada!" > build/bilgi.txt
+          sudo apt-get update
+          sudo apt-get install -y mtools xorriso squashfs-tools wget debootstrap
+
+      - name: Aspendos'u Insa Et
+        run: |
+          mkdir -p work-dir
+          # Temel Debian sistemini kuruyoruz (Aspendos'un kalbi)
+          sudo debootstrap --arch=amd64 --variant=minbase bookworm work-dir http://deb.debian.org/debian/
           
-      - name: Test Yuklemesi
+          # Sistem icine temel paketleri ekleyelim
+          sudo chroot work-dir apt-get update
+          sudo chroot work-dir apt-get install -y --no-install-recommends linux-image-amd64 live-boot network-manager gnome-core
+          
+          # Bos bir ISO olusturma simülasyonu (Hata almamak icin simdilik temel yapi)
+          mkdir -p output
+          echo "Aspendos OS v1.0 Alpha" > output/versiyon.txt
+          # Buraya ilerleyen adimlarda tam ISO komutunu ekleyecegiz
+
+      - name: Dosyayi Yukle
         uses: actions/upload-artifact@v4
         with:
-          name: Aspendos-Test-Dosyasi
-          path: build/
+          name: Aspendos-Paketi
+          path: output/
