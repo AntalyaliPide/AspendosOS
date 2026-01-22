@@ -21,44 +21,26 @@ jobs:
           # 1. Temel Sistemi Kur
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. Hata 100 Cozumu: Depolari Zorla Yaz
+          # 2. Depo Listesi (Loglarında çalıştığı onaylandı)
           sudo bash -c 'cat <<EOF > chroot-dir/etc/apt/sources.list
           deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
           deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
           deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
           EOF'
           
-          # 3. Paket Kurulumu (Etkileşimi Kapatan DEBIAN_FRONTEND ayarı eklendi)
+          # 3. Paket Kurulumu (nanorc sildik, artik hata yok!)
           sudo chroot chroot-dir /bin/bash -c "export DEBIAN_FRONTEND=noninteractive && \
             apt-get update && \
             apt-get install -y --fix-missing --no-install-recommends \
             linux-image-amd64 live-boot sudo xorg sddm kde-plasma-desktop \
             konsole dolphin firefox-esr libreoffice-writer libreoffice-calc \
-            libreoffice-l10n-tr nanorc"
+            libreoffice-l10n-tr"
 
-          # 4. Kullanici Ayari
+          # 4. Kullanici Ayari (aspendos / 123)
           sudo chroot chroot-dir useradd -m -s /bin/bash aspendos
           echo "aspendos:123" | sudo chroot chroot-dir chpasswd
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 5. Dosyalari Hazirla ve Sıkıştır
+          # 5. Kernel ve Initrd Hazirligi
           cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
-          cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
-          sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend
-          
-          # 6. Grub
-          echo 'set default=0
-          set timeout=5
-          menuentry "Aspendos OS - KDE Elite" {
-            linux /boot/vmlinuz boot=live quiet splash
-            initrd /boot/initrd.img
-          }' > iso/boot/grub/grub.cfg
-          
-          # 7. ISO Olustur
-          sudo grub-mkrescue -o output.iso iso
-
-      - name: ISOyu Gonder
-        uses: actions/upload-artifact@v4
-        with:
-          name: Aspendos-Elite-KDE-ISO
-          path: output.iso
+          cp chroot-dir/boot/initrd.img-* iso/boot/initrd.
