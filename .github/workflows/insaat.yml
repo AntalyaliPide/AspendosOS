@@ -1,4 +1,4 @@
-name: Aspendos ISO Final Surum - Tam Yol
+name: Aspendos ISO Masaustu Dahil
 on: [push]
 
 jobs:
@@ -8,59 +8,52 @@ jobs:
       - name: Kodlari Cek
         uses: actions/checkout@v4
 
-      - name: Gerekli Aracları Kur
+      - name: Gerekli Araclar
         run: |
           sudo apt-get update
           sudo apt-get install -y xorriso grub-pc-bin grub-common mtools squashfs-tools debootstrap
 
-      - name: Aspendos Sistemini Insa Et
+      - name: Aspendos Sarayini Insa Et
         run: |
-          # 1. Klasorleri Hazirla
           mkdir -p iso/boot/grub
           mkdir -p iso/live
           
-          # 2. Temel Sistemi Kur (Debian Bookworm)
+          # 1. Sistemi Kur (Arayuz paketlerini buraya ekledik!)
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 3. Kernel, Sudo ve Live Paketlerini Kur
+          # 2. Kernel + Masaustu (XFCE) + Giris Ekrani direkt fırına!
           sudo chroot chroot-dir apt-get update
-          sudo chroot chroot-dir apt-get install -y --no-install-recommends linux-image-amd64 live-boot sudo
-          
-          # 4. KULLANICI VE SIFRE TANIMLA
-          # Kullanici: aspendos | Sifre: 123
+          sudo chroot chroot-dir apt-get install -y --no-install-recommends \
+            linux-image-amd64 live-boot sudo xorg xfce4 xfce4-terminal lightdm
+
+          # 3. Kullanici Ayari
           sudo chroot chroot-dir useradd -m -s /bin/bash aspendos
           echo "aspendos:123" | sudo chroot chroot-dir chpasswd
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 5. LOGO EKLEME
+          # 4. Logo Ekleme
           sudo mkdir -p chroot-dir/usr/share/aspendos
           if [ -f "logo.jpg" ]; then
             sudo cp logo.jpg chroot-dir/usr/share/aspendos/logo.jpg
-          else
-            echo "UYARI: logo.jpg bulunamadi!"
           fi
 
-          # 6. Cekirdek Dosyalarini ISO dizinine tasi
+          # 5. Paketleme
           cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
           cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
-          
-          # 7. Sistemi Paketle (Squashfs)
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend
           
-          # 8. GRUB Yapilandirmasi
+          # 6. Grub
           echo 'set default=0
           set timeout=5
-          menuentry "Aspendos OS - AntalyaliPide Edition" {
+          menuentry "Aspendos OS - Masaustu Surumu" {
             linux /boot/vmlinuz boot=live quiet splash
             initrd /boot/initrd.img
           }' > iso/boot/grub/grub.cfg
           
-          # 9. ISO Dosyasini Olustur (Ismi sabitledik)
           sudo grub-mkrescue -o output.iso iso
 
-      - name: ISOyu Artifact Olarak Yukle
+      - name: ISOyu Gonder
         uses: actions/upload-artifact@v4
         with:
-          name: Aspendos-Logolu-ISO
+          name: Aspendos-Masaustu-ISO
           path: output.iso
-          if-no-files-found: error
