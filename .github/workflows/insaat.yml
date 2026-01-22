@@ -1,4 +1,4 @@
-name: Aspendos ISO Fix
+name: Aspendos ISO Final Surum
 on: [push]
 
 jobs:
@@ -8,43 +8,50 @@ jobs:
       - name: Kodlari Cek
         uses: actions/checkout@v4
 
-      - name: Araclar
+      - name: Gerekli Aracları Kur
         run: |
           sudo apt-get update
           sudo apt-get install -y xorriso grub-pc-bin grub-common mtools squashfs-tools debootstrap
 
-      - name: Tam Sistem Insa (Kernel Dahil)
+      - name: Aspendos Sistemini Insa Et
         run: |
+          # 1. Klasorleri Hazirla
           mkdir -p iso/boot/grub
           mkdir -p iso/live
           
-          # 1. Temel Sistemi Kur
+          # 2. Temel Sistemi Kur (Debian Bookworm)
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. Kernel ve Live Paketlerini chroot icinde kur (ASIL EKSIK BURASIYDI)
+          # 3. Kernel, Sudo ve Live Paketlerini Kur
           sudo chroot chroot-dir apt-get update
-          sudo chroot chroot-dir apt-get install -y --no-install-recommends linux-image-amd64 live-boot
+          sudo chroot chroot-dir apt-get install -y --no-install-recommends linux-image-amd64 live-boot sudo
+          
+          # 4. KULLANICI VE SIFRE TANIMLA (Giris Hatasini Cozer)
+          # Kullanici: aspendos | Sifre: 123
+          sudo chroot chroot-dir useradd -m -s /bin/bash aspendos
+          echo "aspendos:123" | sudo chroot chroot-dir chpasswd
+          echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 3. Kernel dosyalarini ISO klasorune tasi
+          # 5. LOGO EKLEME (logo.jpg dosyasini sisteme gomer)
+          sudo mkdir -p chroot-dir/usr/share/aspendos
+          if [ -f "logo.jpg" ]; then
+            sudo cp logo.jpg chroot-dir/usr/share/aspendos/logo.jpg
+          fi
+
+          # 6. Cekirdek Dosyalarini ISO dizinine tasi
           cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
           cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
           
-          # 4. Sistemi paketle
+          # 7. Sistemi Paketle (Squashfs)
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend
           
-          # 5. Grub Ayari (Dosya yollarini artik bulabilecek)
+          # 8. GRUB (Acilis Menusu) Yapilandirmasi
           echo 'set default=0
           set timeout=5
-          menuentry "Aspendos OS (AntalyaliPide Edition)" {
-            linux /boot/vmlinuz boot=live
+          menuentry "Aspendos OS - AntalyaliPide Edition" {
+            linux /boot/vmlinuz boot=live quiet splash
             initrd /boot/initrd.img
           }' > iso/boot/grub/grub.cfg
           
-          # 6. ISOyu Bas
-          grub-mkrescue -o aspendos-os-v1.iso iso
-
-      - name: ISOyu Gonder
-        uses: actions/upload-artifact@v4
-        with:
-          name: Aspendos-Gercer-ISO
-          path: "*.iso"
+          # 9. ISO Dosyasini Olustur
+          grub-mkrescue -o aspendos-os-v1.
