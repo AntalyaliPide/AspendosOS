@@ -21,32 +21,36 @@ jobs:
           # 1. Temel Sistemi Kur
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. KDE Plasma, Ofis ve Internet Paketi (Gerçek Güç Burada)
+          # 2. Hata 100 Cozumu: Depo Listesini Genislet (Main, Contrib, Non-Free)
+          echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" | sudo tee chroot-dir/etc/apt/sources.list
+          echo "deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" | sudo tee -a chroot-dir/etc/apt/sources.list
+          
+          # 3. Paketleri Kur (KDE Plasma + Office + Firefox)
           sudo chroot chroot-dir apt-get update
           sudo chroot chroot-dir apt-get install -y --no-install-recommends \
             linux-image-amd64 live-boot sudo xorg sddm kde-plasma-desktop \
             konsole dolphin firefox-esr libreoffice-writer libreoffice-calc \
             libreoffice-l10n-tr nanorc
 
-          # 3. Kullanici Ayari (aspendos / 123)
+          # 4. Kullanici Ayari (aspendos / 123)
           sudo chroot chroot-dir useradd -m -s /bin/bash aspendos
           echo "aspendos:123" | sudo chroot chroot-dir chpasswd
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 4. Logo Klasörünü Hazırla
+          # 5. Logo Dosyasini Kontrol Et ve Ekle
           sudo mkdir -p chroot-dir/usr/share/aspendos
           if [ -f "logo.jpg" ]; then
             sudo cp logo.jpg chroot-dir/usr/share/aspendos/logo.jpg
           fi
           
-          # 5. Kernel ve Initrd Dosyalarini Tasi
+          # 6. Kernel ve Initrd Hazirla
           cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
           cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
           
-          # 6. Dosya Sistemini Sıkıştır (Bu işlem biraz sürer)
+          # 7. Sıkıştırma (KDE buyuktur, biraz zaman alir)
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend
           
-          # 7. Boot Menusu (Grub)
+          # 8. Boot Menusu
           echo 'set default=0
           set timeout=5
           menuentry "Aspendos OS - KDE Elite" {
@@ -54,7 +58,7 @@ jobs:
             initrd /boot/initrd.img
           }' > iso/boot/grub/grub.cfg
           
-          # 8. ISO'yu Oluştur
+          # 9. ISOyu Bas
           sudo grub-mkrescue -o output.iso iso
 
       - name: ISOyu Gonder
