@@ -1,4 +1,4 @@
-name: Aspendos ISO Final Surum
+name: Aspendos ISO Final Surum - Tam Yol
 on: [push]
 
 jobs:
@@ -26,16 +26,18 @@ jobs:
           sudo chroot chroot-dir apt-get update
           sudo chroot chroot-dir apt-get install -y --no-install-recommends linux-image-amd64 live-boot sudo
           
-          # 4. KULLANICI VE SIFRE TANIMLA (Giris Hatasini Cozer)
+          # 4. KULLANICI VE SIFRE TANIMLA
           # Kullanici: aspendos | Sifre: 123
           sudo chroot chroot-dir useradd -m -s /bin/bash aspendos
           echo "aspendos:123" | sudo chroot chroot-dir chpasswd
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 5. LOGO EKLEME (logo.jpg dosyasini sisteme gomer)
+          # 5. LOGO EKLEME
           sudo mkdir -p chroot-dir/usr/share/aspendos
           if [ -f "logo.jpg" ]; then
             sudo cp logo.jpg chroot-dir/usr/share/aspendos/logo.jpg
+          else
+            echo "UYARI: logo.jpg bulunamadi!"
           fi
 
           # 6. Cekirdek Dosyalarini ISO dizinine tasi
@@ -45,7 +47,7 @@ jobs:
           # 7. Sistemi Paketle (Squashfs)
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend
           
-          # 8. GRUB (Acilis Menusu) Yapilandirmasi
+          # 8. GRUB Yapilandirmasi
           echo 'set default=0
           set timeout=5
           menuentry "Aspendos OS - AntalyaliPide Edition" {
@@ -53,5 +55,12 @@ jobs:
             initrd /boot/initrd.img
           }' > iso/boot/grub/grub.cfg
           
-          # 9. ISO Dosyasini Olustur
-          grub-mkrescue -o aspendos-os-v1.
+          # 9. ISO Dosyasini Olustur (Ismi sabitledik)
+          sudo grub-mkrescue -o output.iso iso
+
+      - name: ISOyu Artifact Olarak Yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aspendos-Logolu-ISO
+          path: output.iso
+          if-no-files-found: error
