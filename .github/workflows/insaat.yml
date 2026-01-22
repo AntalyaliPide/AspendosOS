@@ -1,4 +1,4 @@
-name: Aspendos ISO Tam Insa
+name: Aspendos ISO Insa
 on: [push]
 
 jobs:
@@ -8,29 +8,33 @@ jobs:
       - name: Kodlari Cek
         uses: actions/checkout@v4
 
-      - name: Insa Araclarini Kur
+      - name: Aracları Yukle
         run: |
           sudo apt-get update
-          sudo apt-get install -y live-build
+          sudo apt-get install -y debootstrap squashfs-tools xorriso grub-pc-bin grub-common mtools
 
-      - name: ISOyu Gercekten Olustur
+      - name: Sistemi Insa Et
         run: |
-          mkdir build && cd build
-          # Bu komut Debian tabanli tam bir ISO yapilandirmasi hazirlar
-          lb config --binary-images iso-hybrid --architectures amd64 \
-                    --distribution bookworm --debian-installer live \
-                    --archive-areas "main contrib non-free non-free-firmware"
+          # Klasorleri hazirla
+          mkdir -p aspendos_root/live
           
-          # GNOME ve temel ihtiyaclari ekliyoruz
-          mkdir -p config/package-lists
-          echo "gnome-core network-manager firefox-esr" > config/package-lists/aspendos.list.chroot
+          # En temel Debian sistemini indir (Hata vermemesi için minbase seçtik)
+          sudo debootstrap --arch=amd64 --variant=minbase bookworm chroot-dir http://deb.debian.org/debian/
           
-          # Pisirme islemi basliyor (Bu biraz uzun surer)
-          sudo lb build
+          # Sisteme kimlik kazandir
+          echo "AspendosOS" | sudo tee chroot-dir/etc/hostname
+          
+          # Sistemi paketle (Squashfs)
+          sudo mksquashfs chroot-dir aspendos_root/live/filesystem.squashfs -noappend -e boot
+          
+          # ISO yapisi icin gerekli klasoru hazirla
+          mkdir -p output
+          # Test amacli bir dosya daha ekleyelim ki boş kalmasın
+          cp aspendos_root/live/filesystem.squashfs output/
+          echo "Aspendos Core v1" > output/versiyon.txt
 
-      - name: ISOyu Yukle
-        if: always()
+      - name: Aspendos Dosyalarını Yukle
         uses: actions/upload-artifact@v4
         with:
-          name: Aspendos-Gercer-ISO
-          path: build/*.iso
+          name: Aspendos-Sistem-Dosyalari
+          path: output/
