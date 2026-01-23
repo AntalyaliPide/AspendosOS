@@ -46,15 +46,26 @@ jobs:
           echo "aspendos:123" | sudo chroot chroot-dir chpasswd
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 5. LOGO VE DUVAR KAĞIDI AYARI
-          sudo mkdir -p chroot-dir/usr/share/backgrounds/aspendos
+          # 5. LOGO VE DUVAR KAĞIDI OPERASYONU (Debian'ı Ezme Yöntemi)
           if [ -f "logo.png" ]; then
+            # Klasörleri oluştur
+            sudo mkdir -p chroot-dir/usr/share/backgrounds/aspendos
             sudo cp logo.png chroot-dir/usr/share/backgrounds/aspendos/wallpaper.png
+            
+            # Debian'ın varsayılan duvar kağıtlarını senin logonla değiştiriyoruz
+            sudo mkdir -p chroot-dir/usr/share/images/desktop-base/
+            sudo cp logo.png chroot-dir/usr/share/images/desktop-base/default-desktop.png
+            sudo cp logo.png chroot-dir/usr/share/images/desktop-base/login-background.png
+            sudo cp logo.png chroot-dir/usr/share/images/desktop-base/desktop-background.png
+
+            # GNOME ayarlarını dconf ile sisteme işle
             sudo mkdir -p chroot-dir/etc/dconf/db/local.d/
             sudo bash -c 'cat <<EOF > chroot-dir/etc/dconf/db/local.d/01-background
           [org/gnome/desktop/background]
-          picture-uri="file:///usr/share/backgrounds/aspendos/wallpaper.png"
+          picture-uri="file:///usr/share/images/desktop-base/default-desktop.png"
           picture-options="zoom"
+          [org/gnome/desktop/screensaver]
+          picture-uri="file:///usr/share/images/desktop-base/default-desktop.png"
           EOF'
             sudo chroot chroot-dir dconf update || true
           fi
@@ -63,7 +74,7 @@ jobs:
           cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
           cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
           
-          # 7. Sıkıştırma
+          # 7. Sıkıştırma (XZ ile paketleme)
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend -comp xz
           
           # 8. Boot Menüsü (Açılışta Logo Desteği)
@@ -82,4 +93,9 @@ jobs:
           }" > iso/boot/grub/grub.cfg
           
           # 9. ISO Oluşturma
-          sudo grub-mkrescue -o output
+          sudo grub-mkrescue -o output.iso iso
+
+      - name: ISOyu Gonder
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aspendos-GN
