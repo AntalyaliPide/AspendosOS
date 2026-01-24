@@ -1,4 +1,4 @@
-name: Aspendos OS Final - Independent Edition
+name: Aptos Final - Independent Edition
 on:
   push:
   workflow_dispatch:
@@ -15,7 +15,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xorriso grub-pc-bin grub-common mtools squashfs-tools debootstrap
 
-      - name: Aspendos Final Insa Et
+      - name: Aptos Final Insa Et
         run: |
           mkdir -p iso/boot/grub
           mkdir -p iso/live
@@ -23,7 +23,7 @@ jobs:
           # 1. Temel Sistem ve Görsel Paketler
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. Paket Kurulumu
+          # 2. Paket Kurulumu (Tam Paket Listesi)
           sudo chroot chroot-dir /bin/bash -c "export DEBIAN_FRONTEND=noninteractive && \
             apt-get update && \
             apt-get install -y \
@@ -33,39 +33,42 @@ jobs:
             papirus-icon-theme arc-theme \
             firefox-esr gnome-terminal neofetch locales"
 
-          # 3. KULLANICI VE TAM YETKİ (Hata Veren Grup Temizlendi)
-          # lpadmin yerine her sistemde olan standart admin gruplarını ekledik
+          # 3. KULLANICI VE TAM YETKİ (Patron Sensin)
           sudo chroot chroot-dir /bin/bash -c "useradd -m -g users -G sudo,adm,cdrom,dip,plugdev -s /bin/bash aspendos"
           echo "aspendos:123" | sudo chroot chroot-dir chpasswd
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 4. KİMLİK DEĞİŞİMİ
-          sudo bash -c "echo 'aspendos-os' > chroot-dir/etc/hostname"
+          # 4. KİMLİK DEĞİŞİMİ (APTOS MÜHRÜ)
+          sudo bash -c "echo 'aptos' > chroot-dir/etc/hostname"
           sudo bash -c 'cat <<EOF > chroot-dir/etc/os-release
-          PRETTY_NAME="Aspendos OS Elite"
-          NAME="Aspendos OS"
-          ID=aspendos
+          PRETTY_NAME="Aptos Elite"
+          NAME="Aptos"
+          ID=aptos
           ID_LIKE=debian
           EOF'
+          # Sistem içindeki Debian yazılarını temizleme
+          sudo sed -i 's/Debian/Aptos/g' chroot-dir/etc/issue
+          sudo sed -i 's/Debian/Aptos/g' chroot-dir/etc/issue.net
 
           # 5. LOGO VE DOKU OPERASYONU (logo.jpg)
           if [ -f "logo.jpg" ]; then
-            sudo mkdir -p chroot-dir/usr/share/backgrounds/aspendos
-            sudo cp logo.jpg chroot-dir/usr/share/backgrounds/aspendos/wallpaper.jpg
+            sudo mkdir -p chroot-dir/usr/share/backgrounds/aptos
+            sudo cp logo.jpg chroot-dir/usr/share/backgrounds/aptos/wallpaper.jpg
             
             sudo mkdir -p chroot-dir/usr/share/images/desktop-base
             sudo cp logo.jpg chroot-dir/usr/share/images/desktop-base/default-desktop.jpg
             sudo cp logo.jpg chroot-dir/usr/share/images/desktop-base/login-background.jpg
 
+            # Aptos Görsel Kimliği (Tema ve İkonlar)
             sudo mkdir -p chroot-dir/etc/dconf/db/local.d/
-            sudo bash -c 'cat <<EOF > chroot-dir/etc/dconf/db/local.d/01-aspendos
+            sudo bash -c 'cat <<EOF > chroot-dir/etc/dconf/db/local.d/01-aptos
           [org/gnome/desktop/interface]
           icon-theme="Papirus-Dark"
           gtk-theme="Arc-Dark"
 
           [org/gnome/desktop/background]
-          picture-uri="file:///usr/share/backgrounds/aspendos/wallpaper.jpg"
-          picture-uri-dark="file:///usr/share/backgrounds/aspendos/wallpaper.jpg"
+          picture-uri="file:///usr/share/backgrounds/aptos/wallpaper.jpg"
+          picture-uri-dark="file:///usr/share/backgrounds/aptos/wallpaper.jpg"
           picture-options="zoom"
           EOF'
             sudo chroot chroot-dir dconf update || true
@@ -77,7 +80,7 @@ jobs:
           cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend -comp xz
 
-          # GRUB (logo.jpg)
+          # GRUB (Açılışta Aptos Ruhu)
           if [ -f "logo.jpg" ]; then
             cp logo.jpg iso/boot/grub/splash.jpg
             SPLASH_CMD="insmod jpeg; background_image /boot/grub/splash.jpg"
@@ -86,7 +89,7 @@ jobs:
           echo "set default=0
           set timeout=5
           $SPLASH_CMD
-          menuentry \"Aspendos OS Elite (Kurulum ve Canlı Mod)\" {
+          menuentry \"Aptos Elite (Kurulum ve Canlı Mod)\" {
             linux /boot/vmlinuz boot=live quiet splash
             initrd /boot/initrd.img
           }" > iso/boot/grub/grub.cfg
@@ -96,5 +99,5 @@ jobs:
       - name: Final ISOyu Gonder
         uses: actions/upload-artifact@v4
         with:
-          name: Aspendos-Final-Independent
+          name: Aptos-Final-Build
           path: output.iso
