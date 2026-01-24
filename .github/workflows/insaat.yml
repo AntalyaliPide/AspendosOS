@@ -1,4 +1,4 @@
-name: Aspendos Elite GNOME Edition
+name: Aspendos Elite GNOME Full Edition
 on:
   push:
   workflow_dispatch:
@@ -15,30 +15,45 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xorriso grub-pc-bin grub-common mtools squashfs-tools debootstrap
 
-      - name: Aspendos GNOME Insa Et
+      - name: Aspendos GNOME Full Insa Et
         run: |
           mkdir -p iso/boot/grub
           mkdir -p iso/live
           
-          # 1. Temel Sistem Kurulumu
+          # 1. Temel Sistem ve Gerekli Ekstra Paketler (Installer dahil)
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. Depo Ayarları
           sudo bash -c 'cat <<EOF > chroot-dir/etc/apt/sources.list
           deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware
           deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
           deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
           EOF'
           
-          # 3. GNOME ve Temel Paketler
+          # calamares-settings-debian ve neofetch (Terminal şovu için) ekliyoruz
           sudo chroot chroot-dir /bin/bash -c "export DEBIAN_FRONTEND=noninteractive && \
             apt-get update && \
             apt-get install -y --no-install-recommends \
             linux-image-amd64 live-boot sudo \
             xserver-xorg-core xserver-xorg-video-all xserver-xorg-input-all \
             gnome-core gnome-terminal nautilus \
-            firefox-esr libreoffice-writer libreoffice-calc \
-            libreoffice-l10n-tr locales mesa-utils"
+            firefox-esr calamares-settings-debian calamares \
+            papirus-icon-theme neofetch locales mesa-utils"
+
+          # 2. SİSTEM ADINI DEĞİŞTİRME (Kimlik Değişimi)
+          sudo bash -c "echo 'AspendosOS' > chroot-dir/etc/hostname"
+          sudo bash -c 'cat <<EOF > chroot-dir/etc/os-release
+          PRETTY_NAME="Aspendos OS Elite"
+          NAME="Aspendos OS"
+          ID=aspendos
+          ID_LIKE=debian
+          HOME_URL="https://aspendos-os.org/"
+          SUPPORT_URL="https://aspendos-os.org/support"
+          BUG_REPORT_URL="https://aspendos-os.org/bugs"
+          EOF'
+
+          # 3. TERMİNAL ŞOVU (Neofetch Ayarı)
+          # Terminal açıldığında sistem bilgilerini Aspendos adıyla gösterir
+          sudo bash -c "echo 'neofetch' >> chroot-dir/etc/skel/.bashrc"
 
           # 4. Dil ve Kullanıcı Ayarları
           sudo chroot chroot-dir /bin/bash -c "echo 'tr_TR.UTF-8 UTF-8' > /etc/locale.gen && locale-gen"
@@ -46,60 +61,52 @@ jobs:
           echo "aspendos:123" | sudo chroot chroot-dir chpasswd
           echo "aspendos ALL=(ALL) NOPASSWD:ALL" | sudo tee chroot-dir/etc/sudoers.d/aspendos
 
-          # 5. LOGO VE DUVAR KAĞIDI OPERASYONU (JPG Düzeltmeli)
-          # Logonu jpg olarak sistem klasörüne atıyoruz
+          # 5. LOGO, RENK PALETİ VE İKONLAR
           if [ -f "logo.jpg" ]; then
             sudo mkdir -p chroot-dir/usr/share/backgrounds/aspendos
             sudo cp logo.jpg chroot-dir/usr/share/backgrounds/aspendos/wallpaper.jpg
             
-            # Debian'ın standartlarını senin logonla değiştir
+            # Debian logolarını ezme
             sudo mkdir -p chroot-dir/usr/share/images/desktop-base
             sudo cp logo.jpg chroot-dir/usr/share/images/desktop-base/default-desktop.jpg
             sudo cp logo.jpg chroot-dir/usr/share/images/desktop-base/login-background.jpg
-            
-            # GNOME Ayarlarını Kilitle (Dconf)
+
+            # Dconf ile İkon ve Renk Ayarları
             sudo mkdir -p chroot-dir/etc/dconf/db/local.d/
-            sudo mkdir -p chroot-dir/etc/dconf/profile/
-            sudo bash -c 'echo -e "user-db:user\nsystem-db:local" > chroot-dir/etc/dconf/profile/user'
-            
-            sudo bash -c 'cat <<EOF > chroot-dir/etc/dconf/db/local.d/01-background
+            sudo bash -c 'cat <<EOF > chroot-dir/etc/dconf/db/local.d/01-aspendos-style
+          [org/gnome/desktop/interface]
+          icon-theme="Papirus-Dark"
+          cursor-theme="Adwaita"
+          font-name="Cantarell 11"
+
           [org/gnome/desktop/background]
           picture-uri="file:///usr/share/backgrounds/aspendos/wallpaper.jpg"
-          picture-uri-dark="file:///usr/share/backgrounds/aspendos/wallpaper.jpg"
           picture-options="zoom"
-          [org/gnome/desktop/screensaver]
-          picture-uri="file:///usr/share/backgrounds/aspendos/wallpaper.jpg"
+
+          [org/gnome/shell/extensions/dash-to-dock]
+          dash-max-icon-size=48
           EOF'
             sudo chroot chroot-dir dconf update || true
           fi
 
-          # 6. Kernel Dosyalarını Kopyala
+          # 6. Kernel ve Boot Ayarları
           cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
           cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
           
-          # 7. Sıkıştırma
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend -comp xz
           
-          # 8. Boot Menüsü (Açılış Logosu)
-          if [ -f "logo.jpg" ]; then
-            # GRUB sadece belirli formatları sever, splash için kopyalıyoruz
-            cp logo.jpg iso/boot/grub/splash.jpg
-            SPLASH_CMD="insmod jpeg; background_image /boot/grub/splash.jpg"
-          fi
-
+          # GRUB Menüsünde İsmi Güncelleme
           echo "set default=0
           set timeout=5
-          $SPLASH_CMD
-          menuentry \"Aspendos OS - GNOME Elite\" {
+          menuentry \"Aspendos OS Elite - Install/Live\" {
             linux /boot/vmlinuz boot=live quiet splash
             initrd /boot/initrd.img
           }" > iso/boot/grub/grub.cfg
           
-          # 9. ISO Oluşturma
           sudo grub-mkrescue -o output.iso iso
 
       - name: ISOyu Gonder
         uses: actions/upload-artifact@v4
         with:
-          name: Aspendos-GNOME-Elite-Final
+          name: Aspendos-Elite-Full-Edition
           path: output.iso
