@@ -1,4 +1,4 @@
-name: Aptos Final - Independent Edition V3
+name: Aptos Final - V4 Safe Edition
 on:
   push:
   workflow_dispatch:
@@ -23,64 +23,49 @@ jobs:
           # 1. Temel Sistem Kurulumu
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. SİSTEMİN İÇİNE GİRİŞ VE TAM DÖNÜŞÜM
+          # 2. SISTEMIN ICINDE OPERASYON (En Sade Hal)
           sudo chroot chroot-dir /bin/bash -c "
             export DEBIAN_FRONTEND=noninteractive
             apt-get update
-            apt-get install -y linux-image-amd64 live-boot sudo gnome-core \
-            calamares-settings-debian calamares papirus-icon-theme arc-theme \
-            firefox-esr gnome-terminal neofetch locales dconf-cli
+            apt-get install -y linux-image-amd64 live-boot sudo gnome-core neofetch locales
             
             # Sistem Kimliği
             echo 'aptos' > /etc/hostname
-            echo '127.0.1.1 aptos' >> /etc/hosts
             
-            # OS-RELEASE Mührü
-            cat <<EOF > /etc/os-release
-            PRETTY_NAME=\"Aptos Elite\"
-            NAME=\"Aptos\"
-            ID=aptos
-            ID_LIKE=debian
-            EOF
-            
-            # Kullanıcı: Aspendos
-            useradd -m -g users -G sudo,adm,cdrom,dip,plugdev -s /bin/bash aspendos
+            # Kullanıcı: aspendos
+            useradd -m -g users -G sudo -s /bin/bash aspendos
             echo 'aspendos:123' | chpasswd
             echo 'aspendos ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/aspendos
             
-            # Neofetch
-            echo 'neofetch' >> /home/aspendos/.bashrc
+            # Yerel Ayarlar
+            echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen
+            locale-gen
           "
 
-          # 3. GÖRSEL DOSYALARI (Hata Vermemesi İçin Kontrollü)
-          if [ -f "logo.jpg" ]; then
-            sudo mkdir -p chroot-dir/usr/share/backgrounds/aptos
-            sudo cp logo.jpg chroot-dir/usr/share/backgrounds/aptos/wallpaper.jpg
-            sudo mkdir -p chroot-dir/usr/share/images/desktop-base
-            sudo cp logo.jpg chroot-dir/usr/share/images/desktop-base/default-desktop.jpg
-          fi
-
-          # 4. KERNEL VE PAKETLEME
-          # Kernel dosya isimlerini wildcard ile garantiye alalım
-          KERNEL_PATH=\$(ls chroot-dir/boot/vmlinuz-* | head -n 1)
-          INITRD_PATH=\$(ls chroot-dir/boot/initrd.img-* | head -n 1)
-          cp \$KERNEL_PATH iso/boot/vmlinuz
-          cp \$INITRD_PATH iso/boot/initrd.img
+          # 3. KERNEL VE INITRD TESPITI (Hata 2'yi Burası Çözer)
+          # Wildcard yerine tam yolu değişkene atıyoruz
+          VMLINUZ_FILE=$(ls chroot-dir/boot/vmlinuz-* | head -n 1)
+          INITRD_FILE=$(ls chroot-dir/boot/initrd.img-* | head -n 1)
           
+          sudo cp -v "$VMLINUZ_FILE" iso/boot/vmlinuz
+          sudo cp -v "$INITRD_FILE" iso/boot/initrd.img
+
+          # 4. DOSYA SISTEMINI SIKISTIRMA
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend -comp xz
 
-          # 5. GRUB
-          echo \"set default=0
+          # 5. GRUB YAPILANDIRMASI (En Basit Mod)
+          echo 'set default=0
           set timeout=5
-          menuentry 'Aptos Elite (Live Mode)' {
+          menuentry "Aptos Elite" {
             linux /boot/vmlinuz boot=live quiet splash
             initrd /boot/initrd.img
-          }\" > iso/boot/grub/grub.cfg
+          }' > iso/boot/grub/grub.cfg
           
-          sudo grub-mkrescue -o Aptos-Elite-V3.iso iso
+          # 6. ISO OLUSTURMA
+          sudo grub-mkrescue -o Aptos-Elite-V4.iso iso
 
-      - name: ISOyukle
+      - name: ISOyu Gonder
         uses: actions/upload-artifact@v4
         with:
-          name: Aptos-Elite-V3-Final
-          path: Aptos-Elite-V3.iso
+          name: Aptos-Elite-V4-Build
+          path: Aptos-Elite-V4.iso
