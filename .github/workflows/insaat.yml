@@ -1,4 +1,4 @@
-name: Aptos Final - V4 Safe Edition
+name: Aptos Final - V4.1 Clean
 on:
   push:
   workflow_dispatch:
@@ -23,27 +23,19 @@ jobs:
           # 1. Temel Sistem Kurulumu
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
-          # 2. SISTEMIN ICINDE OPERASYON (En Sade Hal)
-          sudo chroot chroot-dir /bin/bash -c "
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get update
-            apt-get install -y linux-image-amd64 live-boot sudo gnome-core neofetch locales
-            
-            # Sistem Kimliği
-            echo 'aptos' > /etc/hostname
-            
-            # Kullanıcı: aspendos
-            useradd -m -g users -G sudo -s /bin/bash aspendos
-            echo 'aspendos:123' | chpasswd
-            echo 'aspendos ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/aspendos
-            
-            # Yerel Ayarlar
-            echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen
-            locale-gen
-          "
+          # 2. SISTEM AYARLARI (Hata 2'yi silecek temiz yontem)
+          sudo chroot chroot-dir /bin/bash -c "export DEBIAN_FRONTEND=noninteractive && \
+            apt-get update && \
+            apt-get install -y linux-image-amd64 live-boot sudo gnome-core neofetch locales && \
+            echo 'aptos' > /etc/hostname && \
+            useradd -m -g users -G sudo -s /bin/bash aspendos && \
+            echo 'aspendos:123' | chpasswd && \
+            echo 'aspendos ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/aspendos && \
+            echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && \
+            locale-gen"
 
-          # 3. KERNEL VE INITRD TESPITI (Hata 2'yi Burası Çözer)
-          # Wildcard yerine tam yolu değişkene atıyoruz
+          # 3. KERNEL VE INITRD TESPITI
+          # Artik yollar kesin ve net
           VMLINUZ_FILE=$(ls chroot-dir/boot/vmlinuz-* | head -n 1)
           INITRD_FILE=$(ls chroot-dir/boot/initrd.img-* | head -n 1)
           
@@ -53,13 +45,14 @@ jobs:
           # 4. DOSYA SISTEMINI SIKISTIRMA
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend -comp xz
 
-          # 5. GRUB YAPILANDIRMASI (En Basit Mod)
-          echo 'set default=0
-          set timeout=5
-          menuentry "Aptos Elite" {
-            linux /boot/vmlinuz boot=live quiet splash
-            initrd /boot/initrd.img
-          }' > iso/boot/grub/grub.cfg
+          # 5. GRUB YAPILANDIRMASI
+          # EOF yerine echo kullanarak hata riskini sıfırladık
+          echo 'set default=0' > iso/boot/grub/grub.cfg
+          echo 'set timeout=5' >> iso/boot/grub/grub.cfg
+          echo 'menuentry "Aptos Elite" {' >> iso/boot/grub/grub.cfg
+          echo '  linux /boot/vmlinuz boot=live quiet splash' >> iso/boot/grub/grub.cfg
+          echo '  initrd /boot/initrd.img' >> iso/boot/grub/grub.cfg
+          echo '}' >> iso/boot/grub/grub.cfg
           
           # 6. ISO OLUSTURMA
           sudo grub-mkrescue -o Aptos-Elite-V4.iso iso
