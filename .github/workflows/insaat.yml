@@ -1,4 +1,4 @@
-name: Aptos Final - Independent Edition V2
+name: Aptos Final - Independent Edition V3
 on:
   push:
   workflow_dispatch:
@@ -15,7 +15,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xorriso grub-pc-bin grub-common mtools squashfs-tools debootstrap
 
-      - name: Aptos Elite Insa Et (Zorunlu Mod)
+      - name: Aptos Elite Insa Et
         run: |
           mkdir -p iso/boot/grub
           mkdir -p iso/live
@@ -24,93 +24,63 @@ jobs:
           sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
           
           # 2. SİSTEMİN İÇİNE GİRİŞ VE TAM DÖNÜŞÜM
-          # Bu blok "Debian" olan her şeyi kökten kazır.
           sudo chroot chroot-dir /bin/bash -c "
             export DEBIAN_FRONTEND=noninteractive
             apt-get update
             apt-get install -y linux-image-amd64 live-boot sudo gnome-core \
             calamares-settings-debian calamares papirus-icon-theme arc-theme \
-            firefox-esr gnome-terminal neofetch locales
+            firefox-esr gnome-terminal neofetch locales dconf-cli
             
-            # Sistem Kimliğini Zorla Değiştir
+            # Sistem Kimliği
             echo 'aptos' > /etc/hostname
             echo '127.0.1.1 aptos' >> /etc/hosts
             
-            # OS-RELEASE (Burası mühürdür, Debian yazamaz artık)
+            # OS-RELEASE Mührü
             cat <<EOF > /etc/os-release
             PRETTY_NAME=\"Aptos Elite\"
             NAME=\"Aptos\"
             ID=aptos
             ID_LIKE=debian
-            HOME_URL=\"https://github.com/aptos-os\"
             EOF
             
-            # Dosya içi metin temizliği
-            sed -i 's/Debian/Aptos/g' /etc/issue
-            sed -i 's/Debian/Aptos/g' /etc/issue.net
-            
-            # Kullanıcı: Aspendos (Şifre: 123)
+            # Kullanıcı: Aspendos
             useradd -m -g users -G sudo,adm,cdrom,dip,plugdev -s /bin/bash aspendos
             echo 'aspendos:123' | chpasswd
             echo 'aspendos ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/aspendos
             
-            # Neofetch Otomatik Başlatma
+            # Neofetch
             echo 'neofetch' >> /home/aspendos/.bashrc
-            echo 'neofetch' >> /root/.bashrc
-            
-            # Yerel ayarlar (Hata vermemesi için)
-            echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen
-            locale-gen
           "
 
-          # 3. GÖRSEL DOSYALARI VE LOGO AKTARIMI
+          # 3. GÖRSEL DOSYALARI (Hata Vermemesi İçin Kontrollü)
           if [ -f "logo.jpg" ]; then
             sudo mkdir -p chroot-dir/usr/share/backgrounds/aptos
             sudo cp logo.jpg chroot-dir/usr/share/backgrounds/aptos/wallpaper.jpg
-            
             sudo mkdir -p chroot-dir/usr/share/images/desktop-base
             sudo cp logo.jpg chroot-dir/usr/share/images/desktop-base/default-desktop.jpg
-            sudo cp logo.jpg chroot-dir/usr/share/images/desktop-base/login-background.jpg
-            
-            # Gnome Ayarları (Dconf)
-            sudo mkdir -p chroot-dir/etc/dconf/db/local.d/
-            sudo bash -c 'cat <<EOF > chroot-dir/etc/dconf/db/local.d/01-aptos
-          [org/gnome/desktop/interface]
-          icon-theme=\"Papirus-Dark\"
-          gtk-theme=\"Arc-Dark\"
-
-          [org/gnome/desktop/background]
-          picture-uri=\"file:///usr/share/backgrounds/aptos/wallpaper.jpg\"
-          picture-uri-dark=\"file:///usr/share/backgrounds/aptos/wallpaper.jpg\"
-          picture-options=\"zoom\"
-          EOF'
-            sudo chroot chroot-dir dconf update || true
           fi
 
-          # 4. KERNEL VE SIKIŞTIRMA
-          cp chroot-dir/boot/vmlinuz-* iso/boot/vmlinuz
-          cp chroot-dir/boot/initrd.img-* iso/boot/initrd.img
+          # 4. KERNEL VE PAKETLEME
+          # Kernel dosya isimlerini wildcard ile garantiye alalım
+          KERNEL_PATH=\$(ls chroot-dir/boot/vmlinuz-* | head -n 1)
+          INITRD_PATH=\$(ls chroot-dir/boot/initrd.img-* | head -n 1)
+          cp \$KERNEL_PATH iso/boot/vmlinuz
+          cp \$INITRD_PATH iso/boot/initrd.img
+          
           sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend -comp xz
 
-          # 5. GRUB AYARI
-          if [ -f "logo.jpg" ]; then
-            cp logo.jpg iso/boot/grub/splash.jpg
-            SPLASH_CMD=\"insmod jpeg; background_image /boot/grub/splash.jpg\"
-          fi
-
-          echo "set default=0
+          # 5. GRUB
+          echo \"set default=0
           set timeout=5
-          $SPLASH_CMD
-          menuentry \"Aptos Elite (Live Mode)\" {
+          menuentry 'Aptos Elite (Live Mode)' {
             linux /boot/vmlinuz boot=live quiet splash
             initrd /boot/initrd.img
-          }" > iso/boot/grub/grub.cfg
+          }\" > iso/boot/grub/grub.cfg
           
-          # 6. FİNAL ISO OLUŞTURMA
-          sudo grub-mkrescue -o Aptos-Elite-Final.iso iso
+          sudo grub-mkrescue -o Aptos-Elite-V3.iso iso
 
       - name: ISOyukle
         uses: actions/upload-artifact@v4
         with:
-          name: Aptos-Elite-V2
-          path: Aptos-Elite-Final.iso
+          name: Aptos-Elite-V3-Final
+          path: Aptos-Elite-V3.iso
