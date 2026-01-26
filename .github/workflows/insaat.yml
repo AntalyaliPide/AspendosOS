@@ -1,64 +1,72 @@
-name: Aptos Final - V4.1 Clean
-on:
-  push:
-  workflow_dispatch:
+name: Aptos Arch Elite - V1
+on: [push, workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      options: --privileged
     steps:
-      - name: Kodlari Cek
-        uses: actions/checkout@v4
-
-      - name: Gerekli Araclar
+      - name: Sistemi Guncelle ve Aracları Kur
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xorriso grub-pc-bin grub-common mtools squashfs-tools debootstrap
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm arch-install-scripts squasfs-tools libisoburn grub mtools dosfstools
 
-      - name: Aptos Elite Insa Et
+      - name: Aptos Kok Dizini Olustur (Chroot)
+        run: |
+          mkdir /aptos_root
+          # Temel sistem paketleri (Debian'dan cok daha hafif)
+          pacstrap -K /aptos_root base linux linux-firmware snetctl networkmanager gnome-shell gnome-termainal neofetch sudo
+
+      - name: Aptos Kimliğini Kazı (Kimlik Degisimi)
+        run: |
+          # Hostname ve Isimler
+          echo "aptos" > /aptos_root/etc/hostname
+          
+          # os-release dosyasını tamamen Aptos yapıyoruz
+          cat <<EOF > /aptos_root/etc/os-release
+          NAME="Aptos Elite"
+          ID=aptos
+          ID_LIKE=arch
+          PRETTY_NAME="Aptos Elite GNU/Linux"
+          HOME_URL="https://aptos.org"
+          EOF
+
+          # Kullanıcı Oluşturma (aspendos)
+          arch-chroot /aptos_root /bin/bash -c "
+            useradd -m -g users -G wheel -s /bin/bash aspendos
+            echo 'aspendos:123' | chpasswd
+            echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
+          "
+
+      - name: ISO Hazırla
         run: |
           mkdir -p iso/boot/grub
-          mkdir -p iso/live
+          mkdir -p iso/arch/x86_64
           
-          # 1. Temel Sistem Kurulumu
-          sudo debootstrap --arch=amd64 bookworm chroot-dir http://deb.debian.org/debian/
+          # Dosya sistemini sıkıştır
+          mksquashfs /aptos_root iso/arch/x86_64/airootfs.sfs -comp xz
           
-          # 2. SISTEM AYARLARI (Hata 2'yi silecek temiz yontem)
-          sudo chroot chroot-dir /bin/bash -c "export DEBIAN_FRONTEND=noninteractive && \
-            apt-get update && \
-            apt-get install -y linux-image-amd64 live-boot sudo gnome-core neofetch locales && \
-            echo 'aptos' > /etc/hostname && \
-            useradd -m -g users -G sudo -s /bin/bash aspendos && \
-            echo 'aspendos:123' | chpasswd && \
-            echo 'aspendos ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/aspendos && \
-            echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen && \
-            locale-gen"
+          # Kernel ve Initrd kopyala
+          cp /aptos_root/boot/vmlinuz-linux iso/boot/vmlinuz
+          cp /aptos_root/boot/initramfs-linux.img iso/boot/initrd.img
 
-          # 3. KERNEL VE INITRD TESPITI
-          # Artik yollar kesin ve net
-          VMLINUZ_FILE=$(ls chroot-dir/boot/vmlinuz-* | head -n 1)
-          INITRD_FILE=$(ls chroot-dir/boot/initrd.img-* | head -n 1)
-          
-          sudo cp -v "$VMLINUZ_FILE" iso/boot/vmlinuz
-          sudo cp -v "$INITRD_FILE" iso/boot/initrd.img
+          # GRUB Yapılandırması
+          cat <<EOF > iso/boot/grub/grub.cfg
+          set default=0
+          set timeout=5
+          menuentry "Aptos Elite Arch Edition" {
+            linux /boot/vmlinuz archisobasedir=arch archisolabel=APTOS_LIVE rw
+            initrd /boot/initrd.img
+          }
+          EOF
 
-          # 4. DOSYA SISTEMINI SIKISTIRMA
-          sudo mksquashfs chroot-dir iso/live/filesystem.squashfs -noappend -comp xz
-
-          # 5. GRUB YAPILANDIRMASI
-          # EOF yerine echo kullanarak hata riskini sıfırladık
-          echo 'set default=0' > iso/boot/grub/grub.cfg
-          echo 'set timeout=5' >> iso/boot/grub/grub.cfg
-          echo 'menuentry "Aptos Elite" {' >> iso/boot/grub/grub.cfg
-          echo '  linux /boot/vmlinuz boot=live quiet splash' >> iso/boot/grub/grub.cfg
-          echo '  initrd /boot/initrd.img' >> iso/boot/grub/grub.cfg
-          echo '}' >> iso/boot/grub/grub.cfg
-          
-          # 6. ISO OLUSTURMA
-          sudo grub-mkrescue -o Aptos-Elite-V4.iso iso
+          # ISO Oluştur
+          grub-mkrescue -o Aptos-Arch-V1.iso iso
 
       - name: ISOyu Gonder
         uses: actions/upload-artifact@v4
         with:
-          name: Aptos-Elite-V4-Build
-          path: Aptos-Elite-V4.iso
+          name: Aptos-Arch-Build
+          path: Aptos-Arch-V1.iso
