@@ -1,4 +1,4 @@
-name: Aptos Arch Elite - Universal GUI
+name: Aptos Arch Elite - GUI Final
 on: [push, workflow_dispatch]
 
 jobs:
@@ -14,17 +14,16 @@ jobs:
           pacman -Syu --noconfirm
           pacman -S --noconfirm arch-install-scripts squashfs-tools libisoburn grub mtools dosfstools binutils
 
-      - name: Aptos Kok Dizini ve Surucu Destekli GUI
+      - name: Aptos Kok Dizini ve GUI (Hatasiz Paketler)
         run: |
           mkdir /aptos_root
-          # Ekran karti suruculeri (mesa, vesa, sanal makine suruculeri) eklendi
+          # Gereksiz ve bulunamayan xf86 paketlerini attik.
+          # mesa ve xorg-server her turlu ekran kartini (Sanal/Gercek) calistirir.
           pacstrap -K /aptos_root base linux linux-firmware networkmanager \
           gnome-shell gdm gnome-control-center nautilus gnome-console \
-          gnome-backgrounds sudo fastfetch \
-          mesa mesa-libgl xf86-video-libtlm xf86-video-fbdev xf86-video-vesa \
-          xf86-video-vmware xf86-video-intel xf86-video-amdgpu --noconfirm
+          gnome-backgrounds sudo fastfetch mesa xorg-server xorg-xinit --noconfirm
 
-      - name: Aptos Markalamasi ve Kritik GUI Fix
+      - name: Aptos Markalamasi ve GUI Aktivasyonu
         run: |
           echo "aptos" > /aptos_root/etc/hostname
           
@@ -33,24 +32,18 @@ jobs:
           ID=aptos
           ID_LIKE=arch
           PRETTY_NAME="Aptos Elite Arch Edition"
-          HOME_URL="https://aptos.org"
           EOF
 
           arch-chroot /aptos_root /bin/bash -c "
             systemctl enable gdm
             systemctl enable NetworkManager
-            
             useradd -m -g users -G wheel -s /bin/bash aspendos
             echo 'aspendos:123' | chpasswd
             echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
-            
-            echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen
             locale-gen
-            echo 'LANG=en_US.UTF-8' > /etc/locale.conf
-            echo \"alias neofetch='fastfetch'\" >> /home/aspendos/.bashrc
           "
 
-      - name: ISO'yu Insa Et (Safe Boot)
+      - name: ISO'yu Insa Et
         run: |
           mkdir -p iso/boot/grub
           mkdir -p iso/arch/x86_64
@@ -59,20 +52,19 @@ jobs:
           cp /aptos_root/boot/vmlinuz-linux iso/boot/vmlinuz
           cp /aptos_root/boot/initramfs-linux.img iso/boot/initrd.img
 
-          # "nomodeset" eklemedim cunku GNOME sevmez, ama "rw" ve surucu yardimcilarini ekledim
           cat <<EOF > iso/boot/grub/grub.cfg
           set default=0
           set timeout=5
-          menuentry "Aptos Elite Arch (Universal GUI)" {
-            linux /boot/vmlinuz archisobasedir=arch archisolabel=APTOS_LIVE rw earlyprintk=vga
+          menuentry "Aptos Elite Arch" {
+            linux /boot/vmlinuz archisobasedir=arch archisolabel=APTOS_LIVE rw
             initrd /boot/initrd.img
           }
           EOF
 
-          grub-mkrescue -o Aptos-Arch-Universal.iso iso
+          grub-mkrescue -o Aptos-Arch-Final.iso iso
 
       - name: ISO'yu Yukle
         uses: actions/upload-artifact@v4
         with:
-          name: Aptos-Arch-Universal-Build
-          path: Aptos-Arch-Universal.iso
+          name: Aptos-Arch-Final-Build
+          path: Aptos-Arch-Final.iso
