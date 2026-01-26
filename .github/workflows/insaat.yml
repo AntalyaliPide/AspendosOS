@@ -1,4 +1,4 @@
-name: Aptos Arch Elite - GUI Edition
+name: Aptos Arch Elite - Full GUI
 on: [push, workflow_dispatch]
 
 jobs:
@@ -10,28 +10,79 @@ jobs:
     steps:
       - name: Depolari Guncelle ve Keyring Hatalarini Coz
         run: |
-          # Arch'ta paket indirme hatalarını önlemek için anahtarlığı tazeliyoruz
           pacman -Sy --noconfirm archlinux-keyring
           pacman -Syu --noconfirm
           pacman -S --noconfirm arch-install-scripts squashfs-tools libisoburn grub mtools dosfstools binutils
 
-      - name: Aptos Kok Dizini ve GUI Paketleri (Chroot)
+      - name: Aptos Kok Dizini ve Tam GUI Paketleri
         run: |
           mkdir /aptos_root
-          # base: Sistem çekirdeği
-          # linux, linux-firmware: Sürücüler
-          # gnome, gdm: Masaüstü ve Giriş Ekranı
-          # networkmanager: İnternet bağlantısı
-          pacstrap -K /aptos_root base linux linux-firmware networkmanager gnome-shell gnome-terminal gdm sudo neofetch --noconfirm
+          # gnome-control-center: Ayarlar menusu
+          # nautilus: Dosya yöneticisi
+          # gnome-console: Modern terminal
+          # gnome-backgrounds: Duvar kagitlari
+          pacstrap -K /aptos_root base linux linux-firmware networkmanager \
+          gnome-shell gdm gnome-control-center nautilus gnome-console \
+          gnome-backgrounds sudo fastfetch --noconfirm
 
       - name: Aptos Markalamasi ve GUI Aktivasyonu
         run: |
-          # Hostname Belirleme
           echo "aptos" > /aptos_root/etc/hostname
           
-          # os-release Dosyasını Aptos Yap (Debian'dan kurtulduk!)
+          # os-release Dosyasini Aptos Yap
           cat <<EOF > /aptos_root/etc/os-release
           NAME="Aptos Elite"
           ID=aptos
           ID_LIKE=arch
           PRETTY_NAME="Aptos Elite Arch Edition"
+          HOME_URL="https://aptos.org"
+          EOF
+
+          arch-chroot /aptos_root /bin/bash -c "
+            # GUI ve Network'u Baslangica Ekle
+            systemctl enable gdm
+            systemctl enable NetworkManager
+            
+            # Kullanici: aspendos (Sifre: 123)
+            useradd -m -g users -G wheel -s /bin/bash aspendos
+            echo 'aspendos:123' | chpasswd
+            echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
+            
+            # Yerel Ayarlar
+            echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen
+            locale-gen
+            echo 'LANG=en_US.UTF-8' > /etc/locale.conf
+            
+            # Neofetch aliasini ekle
+            echo \"alias neofetch='fastfetch'\" >> /home/aspendos/.bashrc
+          "
+
+      - name: ISO'yu Insa Et
+        run: |
+          mkdir -p iso/boot/grub
+          mkdir -p iso/arch/x86_64
+          
+          # Dosya sistemini presle
+          mksquashfs /aptos_root iso/arch/x86_64/airootfs.sfs -comp xz
+
+          # Kernel ve Boot dosyalarini kopyala
+          cp /aptos_root/boot/vmlinuz-linux iso/boot/vmlinuz
+          cp /aptos_root/boot/initramfs-linux.img iso/boot/initrd.img
+
+          # GRUB Yapilandirmasi
+          cat <<EOF > iso/boot/grub/grub.cfg
+          set default=0
+          set timeout=5
+          menuentry "Aptos Elite Arch Full GUI" {
+            linux /boot/vmlinuz archisobasedir=arch archisolabel=APTOS_LIVE rw quiet splash
+            initrd /boot/initrd.img
+          }
+          EOF
+
+          grub-mkrescue -o Aptos-Arch-Full.iso iso
+
+      - name: ISO'yu Yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aptos-Arch-Full-Build
+          path: Aptos-Arch-Full.iso
