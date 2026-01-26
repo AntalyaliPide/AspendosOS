@@ -1,4 +1,4 @@
-name: Aptos Arch Elite - V1
+name: Aptos Arch Elite - GUI Edition
 on: [push, workflow_dispatch]
 
 jobs:
@@ -8,65 +8,30 @@ jobs:
       image: archlinux:latest
       options: --privileged
     steps:
-      - name: Sistemi Guncelle ve Aracları Kur
+      - name: Depolari Guncelle ve Keyring Hatalarini Coz
         run: |
+          # Arch'ta paket indirme hatalarını önlemek için anahtarlığı tazeliyoruz
+          pacman -Sy --noconfirm archlinux-keyring
           pacman -Syu --noconfirm
-          pacman -S --noconfirm arch-install-scripts squasfs-tools libisoburn grub mtools dosfstools
+          pacman -S --noconfirm arch-install-scripts squashfs-tools libisoburn grub mtools dosfstools binutils
 
-      - name: Aptos Kok Dizini Olustur (Chroot)
+      - name: Aptos Kok Dizini ve GUI Paketleri (Chroot)
         run: |
           mkdir /aptos_root
-          # Temel sistem paketleri (Debian'dan cok daha hafif)
-          pacstrap -K /aptos_root base linux linux-firmware snetctl networkmanager gnome-shell gnome-termainal neofetch sudo
+          # base: Sistem çekirdeği
+          # linux, linux-firmware: Sürücüler
+          # gnome, gdm: Masaüstü ve Giriş Ekranı
+          # networkmanager: İnternet bağlantısı
+          pacstrap -K /aptos_root base linux linux-firmware networkmanager gnome-shell gnome-terminal gdm sudo neofetch --noconfirm
 
-      - name: Aptos Kimliğini Kazı (Kimlik Degisimi)
+      - name: Aptos Markalamasi ve GUI Aktivasyonu
         run: |
-          # Hostname ve Isimler
+          # Hostname Belirleme
           echo "aptos" > /aptos_root/etc/hostname
           
-          # os-release dosyasını tamamen Aptos yapıyoruz
+          # os-release Dosyasını Aptos Yap (Debian'dan kurtulduk!)
           cat <<EOF > /aptos_root/etc/os-release
           NAME="Aptos Elite"
           ID=aptos
           ID_LIKE=arch
-          PRETTY_NAME="Aptos Elite GNU/Linux"
-          HOME_URL="https://aptos.org"
-          EOF
-
-          # Kullanıcı Oluşturma (aspendos)
-          arch-chroot /aptos_root /bin/bash -c "
-            useradd -m -g users -G wheel -s /bin/bash aspendos
-            echo 'aspendos:123' | chpasswd
-            echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
-          "
-
-      - name: ISO Hazırla
-        run: |
-          mkdir -p iso/boot/grub
-          mkdir -p iso/arch/x86_64
-          
-          # Dosya sistemini sıkıştır
-          mksquashfs /aptos_root iso/arch/x86_64/airootfs.sfs -comp xz
-          
-          # Kernel ve Initrd kopyala
-          cp /aptos_root/boot/vmlinuz-linux iso/boot/vmlinuz
-          cp /aptos_root/boot/initramfs-linux.img iso/boot/initrd.img
-
-          # GRUB Yapılandırması
-          cat <<EOF > iso/boot/grub/grub.cfg
-          set default=0
-          set timeout=5
-          menuentry "Aptos Elite Arch Edition" {
-            linux /boot/vmlinuz archisobasedir=arch archisolabel=APTOS_LIVE rw
-            initrd /boot/initrd.img
-          }
-          EOF
-
-          # ISO Oluştur
-          grub-mkrescue -o Aptos-Arch-V1.iso iso
-
-      - name: ISOyu Gonder
-        uses: actions/upload-artifact@v4
-        with:
-          name: Aptos-Arch-Build
-          path: Aptos-Arch-V1.iso
+          PRETTY_NAME="Aptos Elite Arch Edition"
