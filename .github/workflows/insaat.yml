@@ -1,4 +1,4 @@
-name: Aptos Arch Elite - Final Rescue
+name: Aptos Arch Elite - Complete Edition
 on: [push, workflow_dispatch]
 
 jobs:
@@ -8,62 +8,71 @@ jobs:
       image: archlinux:latest
       options: --privileged
     steps:
-      - name: Sistem ve Gerekli Araclar
+      - name: 1. Sistem ve Gerekli Araclar
         run: |
           pacman -Sy --noconfirm archlinux-keyring
           pacman -Syu --noconfirm
           pacman -S --noconfirm arch-install-scripts squashfs-tools libisoburn grub mtools dosfstools binutils
 
-      - name: Aptos Kok Dizini ve GUI Kurulumu
+      - name: 2. Aptos Kok Dizini ve GUI Kurulumu
         run: |
           mkdir /aptos_root
-          # mkinitcpio-archiso: Live sistemin kalbi, olmazsa olmaz!
+          # mkinitcpio-archiso: ISO'nun can damarı
           pacstrap -K /aptos_root base linux linux-firmware networkmanager \
           gnome-shell gdm gnome-control-center nautilus gnome-console \
           gnome-backgrounds sudo fastfetch mesa xorg-server mkinitcpio-archiso --noconfirm
 
-      - name: Bootloader ve Root Ayarlari
+      - name: 3. AptOS Kimlik ve Sistem Ayarlari (Kritik)
         run: |
           arch-chroot /aptos_root /bin/bash -c "
-            # HOOKS: Arch'ın ISO dosyasını görmesini sağlayan kısımlar
-            echo 'HOOKS=(base udev memdisk archiso_shutdown archiso archiso_loop_mnt archiso_pxe_common archiso_kms block filesystems keyboard)' > /etc/mkinitcpio.conf
+            # Sistemin adini AptOS yap
+            echo 'AptOS' > /etc/hostname
+            
+            # OS-Release bilgilerini AptOS olarak güncelle
+            echo -e 'NAME=\"AptOS\"\nID=aptos\nID_LIKE=arch\nPRETTY_NAME=\"AptOS Elite Arch\"\nANSI_COLOR=\"0;36\"' > /etc/os-release
+            
+            # HOOKS: Hata payi birakmayan en saglam dizilim
+            echo 'HOOKS=(base udev modconf block filesystems keyboard archiso archiso_loop_mnt)' > /etc/mkinitcpio.conf
             mkinitcpio -p linux
             
+            # GUI ve Network'ü aktif et
             systemctl enable gdm
             systemctl enable NetworkManager
+            
+            # Kullaniciyi olustur
             useradd -m -g users -G wheel -s /bin/bash aspendos
             echo 'aspendos:123' | chpasswd
             echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
           "
 
-      - name: ISO Insaatı (Master Build)
+      - name: 4. ISO Insaatı (Master Build)
         run: |
           mkdir -p iso/boot/grub
           mkdir -p iso/arch/x86_64
           
-          # SFS dosyasını oluştur (Sistem buraya paketleniyor)
+          # Sistemi paketle
           mksquashfs /aptos_root iso/arch/x86_64/airootfs.sfs -comp xz
 
-          # Kernel ve Initrd dosyalarını taşı
+          # Boot dosyalarini tasi
           cp /aptos_root/boot/vmlinuz-linux iso/boot/vmlinuz
           cp /aptos_root/boot/initramfs-linux.img iso/boot/initrd.img
 
-          # GRUB Yapılandırması (Label: APTOS)
+          # GRUB Menüsü (Tamamen AptOS temali)
           cat <<EOF > iso/boot/grub/grub.cfg
           set default=0
           set timeout=5
-          menuentry "Aptos Elite Arch Edition" {
+          menuentry \"AptOS Elite Arch Edition v1.0\" {
             linux /boot/vmlinuz archisobasedir=arch archisolabel=APTOS rw quiet splash
             initrd /boot/initrd.img
           }
           EOF
 
-          # ISO'yu mühürle (volid ve archisolabel EŞİT OLMALI)
-          grub-mkrescue -volid "APTOS" -o Aptos-Elite-Arch.iso iso
+          # ISO'yu mühürle
+          grub-mkrescue -volid \"APTOS\" -o AptOS-Elite.iso iso
 
-      - name: ISO'yu Teslim Et (Artifact)
+      - name: 5. ISO'yu Teslim Et
         uses: actions/upload-artifact@v4
         with:
-          name: Aptos-Arch-Package
+          name: AptOS-Elite-Final-ISO
           path: ./*.iso
           if-no-files-found: error
