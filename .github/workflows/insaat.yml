@@ -8,24 +8,24 @@ jobs:
       image: archlinux:latest
       options: --privileged
     steps:
-      - name: Depolari Guncelle
+      - name: Sistem ve Gerekli Araclar
         run: |
           pacman -Sy --noconfirm archlinux-keyring
           pacman -Syu --noconfirm
           pacman -S --noconfirm arch-install-scripts squashfs-tools libisoburn grub mtools dosfstools binutils
 
-      - name: Aptos Kok Dizini ve GUI
+      - name: Aptos Kok Dizini ve GUI Kurulumu
         run: |
           mkdir /aptos_root
-          # Buraya mkinitcpio-archiso paketini ekledim (Kritik!)
+          # mkinitcpio-archiso: Live sistemin kalbi, olmazsa olmaz!
           pacstrap -K /aptos_root base linux linux-firmware networkmanager \
           gnome-shell gdm gnome-control-center nautilus gnome-console \
           gnome-backgrounds sudo fastfetch mesa xorg-server mkinitcpio-archiso --noconfirm
 
-      - name: Bootloader ve Root Tamiri (Kritik Adim)
+      - name: Bootloader ve Root Ayarlari
         run: |
           arch-chroot /aptos_root /bin/bash -c "
-            # HOOKS kismina archiso eklendi, bu olmadan Live sistem acilmaz!
+            # HOOKS: Arch'ın ISO dosyasını görmesini sağlayan kısımlar
             echo 'HOOKS=(base udev memdisk archiso_shutdown archiso archiso_loop_mnt archiso_pxe_common archiso_kms block filesystems keyboard)' > /etc/mkinitcpio.conf
             mkinitcpio -p linux
             
@@ -36,18 +36,34 @@ jobs:
             echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
           "
 
-      - name: ISO'yu Insa Et (The Master Key)
+      - name: ISO Insaatı (Master Build)
         run: |
           mkdir -p iso/boot/grub
           mkdir -p iso/arch/x86_64
+          
+          # SFS dosyasını oluştur (Sistem buraya paketleniyor)
           mksquashfs /aptos_root iso/arch/x86_64/airootfs.sfs -comp xz
 
+          # Kernel ve Initrd dosyalarını taşı
           cp /aptos_root/boot/vmlinuz-linux iso/boot/vmlinuz
           cp /aptos_root/boot/initramfs-linux.img iso/boot/initrd.img
 
+          # GRUB Yapılandırması (Label: APTOS)
           cat <<EOF > iso/boot/grub/grub.cfg
           set default=0
           set timeout=5
           menuentry "Aptos Elite Arch Edition" {
-            # archisolabel ve volid birebir APTOS olmali
-            linux /boot/v
+            linux /boot/vmlinuz archisobasedir=arch archisolabel=APTOS rw quiet splash
+            initrd /boot/initrd.img
+          }
+          EOF
+
+          # ISO'yu mühürle (volid ve archisolabel EŞİT OLMALI)
+          grub-mkrescue -volid "APTOS" -o Aptos-Elite-Arch.iso iso
+
+      - name: ISO'yu Teslim Et (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aptos-Arch-Package
+          path: ./*.iso
+          if-no-files-found: error
