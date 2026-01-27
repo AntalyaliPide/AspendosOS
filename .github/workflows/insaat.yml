@@ -17,15 +17,16 @@ jobs:
       - name: Aptos Kok Dizini ve GUI
         run: |
           mkdir /aptos_root
+          # Buraya mkinitcpio-archiso paketini ekledim (Kritik!)
           pacstrap -K /aptos_root base linux linux-firmware networkmanager \
           gnome-shell gdm gnome-control-center nautilus gnome-console \
-          gnome-backgrounds sudo fastfetch mesa xorg-server --noconfirm
+          gnome-backgrounds sudo fastfetch mesa xorg-server mkinitcpio-archiso --noconfirm
 
       - name: Bootloader ve Root Tamiri (Kritik Adim)
         run: |
           arch-chroot /aptos_root /bin/bash -c "
-            # mkinitcpio'yu LIVE sisteme en uygun hale getiriyoruz
-            echo 'HOOKS=(base udev autodetect modconf block filesystems keyboard fsck)' > /etc/mkinitcpio.conf
+            # HOOKS kismina archiso eklendi, bu olmadan Live sistem acilmaz!
+            echo 'HOOKS=(base udev memdisk archiso_shutdown archiso archiso_loop_mnt archiso_pxe_common archiso_kms block filesystems keyboard)' > /etc/mkinitcpio.conf
             mkinitcpio -p linux
             
             systemctl enable gdm
@@ -44,22 +45,9 @@ jobs:
           cp /aptos_root/boot/vmlinuz-linux iso/boot/vmlinuz
           cp /aptos_root/boot/initramfs-linux.img iso/boot/initrd.img
 
-          # BU KISIM COK KRITIK: rootflags ve archisolabel her turlu ihtimale karsi eklendi
           cat <<EOF > iso/boot/grub/grub.cfg
           set default=0
           set timeout=5
           menuentry "Aptos Elite Arch Edition" {
-            linux /boot/vmlinuz archisobasedir=arch archisolabel=APTOS_ARCH rootflags=loop rw
-            initrd /boot/initrd.img
-          }
-          EOF
-
-          # -volid APTOS_ARCH ile etiketi tam uyumlu hale getiriyoruz
-          # -joliet ve -rock ekleyerek dosya sistemi uyumlulugunu artiriyoruz
-          grub-mkrescue -volid "APTOS_ARCH" -o Aptos-Arch-Universal.iso iso
-
-      - name: ISO'yu Yukle
-        uses: actions/upload-artifact@v4
-        with:
-          name: Aptos-Arch-Final-Build
-          path: Aptos-Arch-Universal.iso
+            # archisolabel ve volid birebir APTOS olmali
+            linux /boot/v
