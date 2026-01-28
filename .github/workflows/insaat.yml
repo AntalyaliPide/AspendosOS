@@ -1,4 +1,4 @@
-name: Aptos Arch Elite - Complete Edition
+name: Aptos Arch Elite - Branding Edition
 on: [push, workflow_dispatch]
 
 jobs:
@@ -8,13 +8,13 @@ jobs:
       image: archlinux:latest
       options: --privileged
     steps:
-      - name: 1. Sistem ve Gerekli Araclar
+      - name: 1. Sistem Hazirligi
         run: |
           pacman -Sy --noconfirm archlinux-keyring
           pacman -Syu --noconfirm
           pacman -S --noconfirm arch-install-scripts squashfs-tools libisoburn grub mtools dosfstools binutils
 
-      - name: 2. Aptos Kok Dizini ve GUI Kurulumu
+      - name: 2. Paketleri Yukle (Firefox ve Fastfetch Dahil)
         run: |
           mkdir /aptos_root
           pacstrap -K /aptos_root base linux linux-firmware networkmanager \
@@ -22,16 +22,24 @@ jobs:
           gnome-backgrounds sudo fastfetch mesa xorg-server mkinitcpio-archiso \
           firefox nm-connection-editor --noconfirm
 
-      - name: 3. AptOS Kimlik ve Sistem Ayarlari
+      - name: 3. AptOS Kimlik Kazima İşlemi
         run: |
           arch-chroot /aptos_root /bin/bash -c "
+            # Hostname ve OS Bilgileri
             echo 'AptOS' > /etc/hostname
             echo -e 'NAME=\"AptOS\"\nID=aptos\nID_LIKE=arch\nPRETTY_NAME=\"AptOS Elite Arch\"\nANSI_COLOR=\"0;36\"' > /etc/os-release
             
-            # HOOKS kısmına 'copytoram' ve 'sd-vconsole' gibi destekler ekleyerek riski azaltıyoruz
+            # Terminale AptOS Logosu ve Fastfetch Ekleme
+            echo \"printf '\e[1;36m%s\e[0m\n' '  ___        _    ___  ____  '\" >> /etc/bash.bashrc
+            echo \"printf '\e[1;36m%s\e[0m\n' ' / _ \ _ __| |_ / _ \/ ___| '\" >> /etc/bash.bashrc
+            echo \"printf '\e[1;33m%s\e[0m\n' '| |_| |  _ \  _| | | \___ \ '\" >> /etc/bash.bashrc
+            echo \"printf '\e[1;33m%s\e[0m\n' '|  _  | |_) | |_| |_| |___) |'\" >> /etc/bash.bashrc
+            echo \"printf '\e[1;32m%s\e[0m\n' '|_| |_| .__/ \__|\___/|____/ '\" >> /etc/bash.bashrc
+            echo \"fastfetch\" >> /etc/bash.bashrc
+
+            # Klasik Ayarlar
             echo 'HOOKS=(base udev modconf block filesystems keyboard archiso archiso_loop_mnt)' > /etc/mkinitcpio.conf
             mkinitcpio -p linux
-            
             systemctl enable gdm
             systemctl enable NetworkManager
             useradd -m -g users -G wheel -s /bin/bash aspendos
@@ -39,29 +47,25 @@ jobs:
             echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
           "
 
-      - name: 4. ISO Insaatı (Etiket Fix Uygulandi)
+      - name: 4. ISO İnşası (Etiket Kilidi)
         run: |
           mkdir -p iso/boot/grub
           mkdir -p iso/arch/x86_64
           mksquashfs /aptos_root iso/arch/x86_64/airootfs.sfs -comp xz
           cp /aptos_root/boot/vmlinuz-linux iso/boot/vmlinuz
           cp /aptos_root/boot/initramfs-linux.img iso/boot/initrd.img
-
-          # GRUB: Hem etiketi arayacak hem de 'img_label' kullanarak işi sağlama alacak
           cat <<EOF > iso/boot/grub/grub.cfg
           set default=0
           set timeout=5
-          menuentry "AptOS Elite Arch Edition" {
+          menuentry "AptOS Elite Arch Edition v1.0" {
             linux /boot/vmlinuz archisobasedir=arch archisolabel=APTOS rw quiet splash
             initrd /boot/initrd.img
           }
           EOF
-
-          # ISO yazarken etiketi zorla 'APTOS' yapıyoruz
           grub-mkrescue -o AptOS-Elite.iso iso -- -volid APTOS -joliet on
 
       - name: 5. ISO'yu Teslim Et
         uses: actions/upload-artifact@v4
         with:
-          name: AptOS-Elite-Final-ISO
+          name: AptOS-Elite-Branded
           path: AptOS-Elite.iso
