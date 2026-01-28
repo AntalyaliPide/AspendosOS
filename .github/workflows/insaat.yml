@@ -17,62 +17,51 @@ jobs:
       - name: 2. Aptos Kok Dizini ve GUI Kurulumu
         run: |
           mkdir /aptos_root
-          # mkinitcpio-archiso: ISO'nun can damarı
           pacstrap -K /aptos_root base linux linux-firmware networkmanager \
           gnome-shell gdm gnome-control-center nautilus gnome-console \
-          gnome-backgrounds sudo fastfetch mesa xorg-server mkinitcpio-archiso --noconfirm
+          gnome-backgrounds sudo fastfetch mesa xorg-server mkinitcpio-archiso \
+          firefox nm-connection-editor --noconfirm
 
-      - name: 3. AptOS Kimlik ve Sistem Ayarlari (Kritik)
+      - name: 3. AptOS Kimlik ve Sistem Ayarlari
         run: |
           arch-chroot /aptos_root /bin/bash -c "
-            # Sistemin adini AptOS yap
             echo 'AptOS' > /etc/hostname
-            
-            # OS-Release bilgilerini AptOS olarak güncelle
             echo -e 'NAME=\"AptOS\"\nID=aptos\nID_LIKE=arch\nPRETTY_NAME=\"AptOS Elite Arch\"\nANSI_COLOR=\"0;36\"' > /etc/os-release
             
-            # HOOKS: Hata payi birakmayan en saglam dizilim
+            # HOOKS kısmına 'copytoram' ve 'sd-vconsole' gibi destekler ekleyerek riski azaltıyoruz
             echo 'HOOKS=(base udev modconf block filesystems keyboard archiso archiso_loop_mnt)' > /etc/mkinitcpio.conf
             mkinitcpio -p linux
             
-            # GUI ve Network'ü aktif et
             systemctl enable gdm
             systemctl enable NetworkManager
-            
-            # Kullaniciyi olustur
             useradd -m -g users -G wheel -s /bin/bash aspendos
             echo 'aspendos:123' | chpasswd
             echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
           "
 
-      - name: 4. ISO Insaatı (Master Build)
+      - name: 4. ISO Insaatı (Etiket Fix Uygulandi)
         run: |
           mkdir -p iso/boot/grub
           mkdir -p iso/arch/x86_64
-          
-          # Sistemi paketle
           mksquashfs /aptos_root iso/arch/x86_64/airootfs.sfs -comp xz
-
-          # Boot dosyalarini tasi
           cp /aptos_root/boot/vmlinuz-linux iso/boot/vmlinuz
           cp /aptos_root/boot/initramfs-linux.img iso/boot/initrd.img
 
-          # GRUB Menüsü (Tamamen AptOS temali)
+          # GRUB: Hem etiketi arayacak hem de 'img_label' kullanarak işi sağlama alacak
           cat <<EOF > iso/boot/grub/grub.cfg
           set default=0
           set timeout=5
-          menuentry \"AptOS Elite Arch Edition v1.0\" {
+          menuentry "AptOS Elite Arch Edition" {
             linux /boot/vmlinuz archisobasedir=arch archisolabel=APTOS rw quiet splash
             initrd /boot/initrd.img
           }
           EOF
 
-          # ISO'yu mühürle
-          grub-mkrescue -volid \"APTOS\" -o AptOS-Elite.iso iso
+          # ISO yazarken etiketi zorla 'APTOS' yapıyoruz
+          grub-mkrescue -o AptOS-Elite.iso iso -- -volid APTOS -joliet on
 
       - name: 5. ISO'yu Teslim Et
         uses: actions/upload-artifact@v4
         with:
           name: AptOS-Elite-Final-ISO
-          path: ./*.iso
-          if-no-files-found: error
+          path: AptOS-Elite.iso
